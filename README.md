@@ -12,6 +12,42 @@ This works fine, but if you have any hidden colliders outside your avatar's boun
 [![Unity 2019.4+](https://img.shields.io/badge/Unity-2019.4+-blue)](https://unity.com)
 [![NDMF Compatible](https://img.shields.io/badge/NDMF-Compatible-purple)](https://github.com/bdunderscore/ndmf)
 
+## Differences from Original VRChat Version
+Platform Changes
+ChilloutVR Support - Works with CVRAvatar instead of VRCAvatarDescriptor
+
+Reflection-Based - Uses reflection to access CVR CCK types, no direct assembly dependencies needed
+
+CVR-Specific Values - Arm ratio calculations optimized for ChilloutVR's IK system (default: 0.4537)
+
+ViewPosition Handling - Properly handles CVR's automatic viewPosition scaling system
+
+Technical Improvements
+NDMF Integration - Non-destructive workflow using NDMF build pipeline
+
+No CCK Assembly Reference - Works without needing CVR CCK assembly definitions
+
+Component-Based - Add scaling as a component that processes during build
+
+Better Preview - More reliable preview with proper restoration of CVR avatar settings
+
+### Requirements
+Required Dependencies
+Unity 2021.3 or newer (ChilloutVR recommended version)
+
+ChilloutVR CCK (latest version)
+
+Download from ChilloutVR Documentation
+
+NDMF (Non-Destructive Modular Framework) (Recommended)
+
+Install via VCC: https://vpm.nadena.dev/vpm.json
+
+Or download from NDMF GitHub
+
+Optional (for advanced users)
+Chillaxins - Reference implementation for NDMF on CVR
+
 ## 🚀 Quick Install
 
 Add to VCC with one click:
