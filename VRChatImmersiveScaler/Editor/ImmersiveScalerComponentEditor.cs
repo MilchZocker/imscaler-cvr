@@ -220,6 +220,7 @@ namespace VRChatImmersiveScaler.Editor
         private Dictionary<Transform, TransformState> originalTransformStates = new Dictionary<Transform, TransformState>();
         private Component previewAvatar = null;
         private Vector3 storedOriginalViewPosition;
+        private Vector3 storedOriginalVoicePosition;
 
         // Helper class to store transform state
         private class TransformState
@@ -465,6 +466,7 @@ namespace VRChatImmersiveScaler.Editor
         {
             previewAvatar = avatar;
             storedOriginalViewPosition = CVRReflectionHelper.GetViewPosition(avatar);
+            storedOriginalVoicePosition = CVRReflectionHelper.GetVoicePosition(avatar);
             PreviewScaling(component, avatar);
         }
 
@@ -485,12 +487,21 @@ namespace VRChatImmersiveScaler.Editor
             }
             Undo.RecordObject(avatar, "Preview Immersive Scaling");
 
-            // Store original viewPosition
+            // Store original viewPosition and voicePosition for restoration
             if (!component.hasStoredOriginalViewPosition)
             {
                 component.originalViewPosition = CVRReflectionHelper.GetViewPosition(avatar);
                 component.hasStoredOriginalViewPosition = true;
             }
+            
+            if (!component.hasStoredOriginalVoicePosition)
+            {
+                component.originalVoicePosition = CVRReflectionHelper.GetVoicePosition(avatar);
+                component.hasStoredOriginalVoicePosition = true;
+            }
+
+            Debug.Log($"[Preview] Original viewPosition: {component.originalViewPosition}");
+            Debug.Log($"[Preview] Original voicePosition: {component.originalVoicePosition}");
 
             // Apply scaling
             var scalerCore = new ImmersiveScalerCore(avatar.gameObject);
@@ -526,10 +537,34 @@ namespace VRChatImmersiveScaler.Editor
 
             scalerCore.ScaleAvatar(parameters);
 
-            // Update viewPosition
+            // Calculate scale ratio
             Vector3 newAvatarScale = avatar.transform.localScale;
             float scaleRatio = newAvatarScale.y / originalAvatarScale.y;
-            CVRReflectionHelper.SetViewPosition(avatar, component.originalViewPosition * scaleRatio);
+
+            Debug.Log($"[Preview] Avatar scale changed from {originalAvatarScale} to {newAvatarScale}");
+            Debug.Log($"[Preview] Scale ratio: {scaleRatio}");
+
+            // DON'T manually scale viewPosition/voicePosition here
+            // CVRAvatar's CheckScaleViewAndVoicePositions() handles this automatically
+            
+            // Log what CVRAvatar should auto-scale to
+            Vector3 expectedViewPosition = component.originalViewPosition * scaleRatio;
+            Vector3 expectedVoicePosition = component.originalVoicePosition * scaleRatio;
+            Debug.Log($"[Preview] Expected viewPosition after CVRAvatar auto-scale: {expectedViewPosition}");
+            Debug.Log($"[Preview] Expected voicePosition after CVRAvatar auto-scale: {expectedVoicePosition}");
+            
+            // Force a repaint which will trigger CVRAvatar's Update() and auto-scale the positions
+            EditorUtility.SetDirty(avatar);
+            
+            // Give CVRAvatar time to process the scale change
+            EditorApplication.delayCall += () =>
+            {
+                if (avatar != null)
+                {
+                    Debug.Log($"[Preview] Actual viewPosition after auto-scale: {CVRReflectionHelper.GetViewPosition(avatar)}");
+                    Debug.Log($"[Preview] Actual voicePosition after auto-scale: {CVRReflectionHelper.GetVoicePosition(avatar)}");
+                }
+            };
 
             // Apply additional tools if enabled
             if (component.applyFingerSpreading)
@@ -543,7 +578,6 @@ namespace VRChatImmersiveScaler.Editor
                 ApplyHipBoneFix(avatar);
             }
 
-            EditorUtility.SetDirty(avatar);
             EditorUtility.SetDirty(avatar.gameObject);
 
             isPreviewActive = true;
@@ -553,12 +587,10 @@ namespace VRChatImmersiveScaler.Editor
         {
             if (!isPreviewActive) return;
 
-            if (component.hasStoredOriginalViewPosition)
-            {
-                CVRReflectionHelper.SetViewPosition(avatar, component.originalViewPosition);
-                EditorUtility.SetDirty(avatar);
-            }
+            Debug.Log("[Preview] Canceling preview and restoring original state...");
 
+            // First, restore all transforms (including scale)
+            // This will trigger CVRAvatar's auto-scaling
             foreach (var kvp in originalTransformStates)
             {
                 if (kvp.Key != null)
@@ -568,21 +600,47 @@ namespace VRChatImmersiveScaler.Editor
                 }
             }
 
+            // After restoring scale, CVRAvatar will automatically scale viewPosition/voicePosition
+            // We need to wait for that, then force-set to original values
+            EditorUtility.SetDirty(avatar);
+            EditorUtility.SetDirty(avatar.gameObject);
+
+            // Use delayCall to ensure CVRAvatar's Update() has run
+            var avatarRef = avatar;
+            var comp = component;
+            EditorApplication.delayCall += () =>
+            {
+                if (avatarRef != null && comp != null)
+                {
+                    // Now force-set the original positions to override any auto-scaling
+                    if (comp.hasStoredOriginalViewPosition)
+                    {
+                        CVRReflectionHelper.SetViewPosition(avatarRef, comp.originalViewPosition);
+                        Debug.Log($"[Preview] Force-restored viewPosition to original: {comp.originalViewPosition}");
+                    }
+                    
+                    if (comp.hasStoredOriginalVoicePosition)
+                    {
+                        CVRReflectionHelper.SetVoicePosition(avatarRef, comp.originalVoicePosition);
+                        Debug.Log($"[Preview] Force-restored voicePosition to original: {comp.originalVoicePosition}");
+                    }
+                    
+                    EditorUtility.SetDirty(avatarRef);
+                }
+            };
+
             originalTransformStates.Clear();
             isPreviewActive = false;
             previewAvatar = null;
-
-            EditorUtility.SetDirty(avatar);
-            EditorUtility.SetDirty(avatar.gameObject);
         }
 
         private void ResetPreviewWithStoredReferences()
         {
             if (!isPreviewActive || previewAvatar == null) return;
 
-            CVRReflectionHelper.SetViewPosition(previewAvatar, storedOriginalViewPosition);
-            EditorUtility.SetDirty(previewAvatar);
+            Debug.Log("[Preview] Canceling preview with stored references...");
 
+            // Restore all transforms first
             foreach (var kvp in originalTransformStates)
             {
                 if (kvp.Key != null)
@@ -592,11 +650,30 @@ namespace VRChatImmersiveScaler.Editor
                 }
             }
 
-            originalTransformStates.Clear();
-            isPreviewActive = false;
-
             EditorUtility.SetDirty(previewAvatar);
             EditorUtility.SetDirty(previewAvatar.gameObject);
+
+            // Delay the position restoration to override CVRAvatar's auto-scaling
+            var avatarRef = previewAvatar;
+            var origView = storedOriginalViewPosition;
+            var origVoice = storedOriginalVoicePosition;
+            
+            EditorApplication.delayCall += () =>
+            {
+                if (avatarRef != null)
+                {
+                    CVRReflectionHelper.SetViewPosition(avatarRef, origView);
+                    CVRReflectionHelper.SetVoicePosition(avatarRef, origVoice);
+                    
+                    Debug.Log($"[Preview] Force-restored viewPosition to: {origView}");
+                    Debug.Log($"[Preview] Force-restored voicePosition to: {origVoice}");
+                    
+                    EditorUtility.SetDirty(avatarRef);
+                }
+            };
+
+            originalTransformStates.Clear();
+            isPreviewActive = false;
             previewAvatar = null;
         }
 

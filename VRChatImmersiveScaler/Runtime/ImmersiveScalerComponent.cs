@@ -103,12 +103,18 @@ namespace VRChatImmersiveScaler
         [Tooltip("Use bone positions instead of mesh bounds for floor calculation (more reliable but less accurate)")]
         public bool useBoneBasedFloorCalculation = false;
 
-        // Store original viewPosition for restoration if needed
+        // Store original positions for restoration if needed
         [HideInInspector]
         public Vector3 originalViewPosition;
 
         [HideInInspector]
+        public Vector3 originalVoicePosition;
+
+        [HideInInspector]
         public bool hasStoredOriginalViewPosition = false;
+
+        [HideInInspector]
+        public bool hasStoredOriginalVoicePosition = false;
 
         // Debug visualization
         [HideInInspector]

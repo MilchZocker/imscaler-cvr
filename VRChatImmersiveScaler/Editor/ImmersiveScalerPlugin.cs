@@ -28,20 +28,19 @@ namespace VRChatImmersiveScaler.Editor
                         return;
                     }
 
-                    // Store original viewPosition if not already stored
-                    if (!component.hasStoredOriginalViewPosition)
-                    {
-                        component.originalViewPosition = CVRReflectionHelper.GetViewPosition(descriptor);
-                        component.hasStoredOriginalViewPosition = true;
-                    }
-
                     Debug.Log($"[ImmersiveScaler] Starting scaling process. Target height: {component.targetHeight}m");
+
+                    // Store original positions for logging only
+                    Vector3 originalViewPosition = CVRReflectionHelper.GetViewPosition(descriptor);
+                    Vector3 originalVoicePosition = CVRReflectionHelper.GetVoicePosition(descriptor);
+                    
+                    Debug.Log($"[ImmersiveScaler] Original viewPosition: {originalViewPosition}");
+                    Debug.Log($"[ImmersiveScaler] Original voicePosition: {originalVoicePosition}");
 
                     // Create scaling core
                     var scalerCore = new ImmersiveScalerCore(ctx.AvatarRootTransform.gameObject);
 
-                    // Measure original dimensions
-                    float originalEyeHeight = scalerCore.GetEyeHeight();
+                    // Store original avatar scale
                     Vector3 originalAvatarScale = ctx.AvatarRootTransform.localScale;
 
                     // Create parameters from component
@@ -80,15 +79,24 @@ namespace VRChatImmersiveScaler.Editor
                     Vector3 newAvatarScale = ctx.AvatarRootTransform.localScale;
                     float scaleRatio = newAvatarScale.y / originalAvatarScale.y;
 
-                    // Update viewPosition via reflection
-                    if (!component.skipMainRescale && !component.skipHeightScaling)
-                    {
-                        CVRReflectionHelper.SetViewPosition(descriptor, component.originalViewPosition * scaleRatio);
-                    }
+                    Debug.Log($"[ImmersiveScaler] Avatar scale changed from {originalAvatarScale} to {newAvatarScale}");
+                    Debug.Log($"[ImmersiveScaler] Scale ratio: {scaleRatio}");
 
+                    // DON'T manually scale viewPosition/voicePosition
+                    // CVRAvatar's CheckScaleViewAndVoicePositions() will handle this automatically
+                    // when it detects the scale change in the next Update() cycle
+                    
+                    // Instead, just force an editor update to trigger CVRAvatar's auto-scaling
                     EditorUtility.SetDirty(descriptor);
 
-                    Debug.Log($"[ImmersiveScaler] Scaling complete. Final height: {(scalerCore.GetHighestPoint() - scalerCore.GetLowestPoint()):F3}m");
+                    // Log what the positions should become
+                    Vector3 expectedViewPosition = originalViewPosition * scaleRatio;
+                    Vector3 expectedVoicePosition = originalVoicePosition * scaleRatio;
+                    Debug.Log($"[ImmersiveScaler] Expected viewPosition after CVRAvatar auto-scale: {expectedViewPosition}");
+                    Debug.Log($"[ImmersiveScaler] Expected voicePosition after CVRAvatar auto-scale: {expectedVoicePosition}");
+
+                    float finalHeight = scalerCore.GetHighestPoint() - scalerCore.GetLowestPoint();
+                    Debug.Log($"[ImmersiveScaler] Scaling complete. Final height: {finalHeight:F3}m (target was {component.targetHeight:F3}m)");
 
                     // Apply additional tools
                     if (component.applyFingerSpreading)
@@ -106,6 +114,8 @@ namespace VRChatImmersiveScaler.Editor
 
                     // Remove component after processing
                     Object.DestroyImmediate(component);
+                    
+                    Debug.Log("[ImmersiveScaler] ✓ Processing complete - CVRAvatar will auto-scale viewPosition and voicePosition");
                 });
         }
 
