@@ -1,10 +1,8 @@
 {
     "name": "VRChatImmersiveScaler.Editor",
-    "rootNamespace": "VRChatImmersiveScaler.Editor",
+    "rootNamespace": "",
     "references": [
         "VRChatImmersiveScaler.Runtime",
-        "VRC.SDKBase",
-        "VRC.SDK3A",
         "nadena.dev.ndmf",
         "nadena.dev.ndmf.runtime"
     ],
@@ -17,17 +15,6 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [
-        {
-            "name": "com.vrchat.avatars",
-            "expression": "",
-            "define": "VRC_SDK_VRCSDK3"
-        },
-        {
-            "name": "nadena.dev.ndmf",
-            "expression": "",
-            "define": "NDMF_AVAILABLE"
-        }
-    ],
+    "versionDefines": [],
     "noEngineReferences": false
 }
